@@ -241,17 +241,20 @@ def get_position(symbol: str) -> dict[str, Any]:
     )
 
 
-def get_watchlist(name: str = "Default") -> list[dict[str, Any]]:
-    """Get stocks in a watchlist.
+def _watchlist_results(payload: Any) -> list[dict[str, Any]]:
+    """Normalize a robin_stocks watchlist payload to a list of records.
 
-    Args:
-        name: Watchlist name (default: "Default").
-
-    Returns:
-        List of watchlist items with instrument details.
+    robin_stocks 3.4.0 returns a dict shaped ``{"results": [...]}`` for both
+    ``get_all_watchlists()`` and ``get_watchlist_by_name()``. Older versions
+    (and the unit-test mocks) hand back a bare list. Accept either, and treat
+    anything else as empty rather than letting a dict silently coerce to [].
     """
-    result = _safe_call(rh.account.get_watchlist_by_name, name=name)
-    return result if isinstance(result, list) else []
+    if isinstance(payload, dict):
+        results = payload.get("results")
+        return results if isinstance(results, list) else []
+    if isinstance(payload, list):
+        return payload
+    return []
 
 
 def list_watchlists() -> list[dict[str, Any]]:
@@ -260,11 +263,52 @@ def list_watchlists() -> list[dict[str, Any]]:
     Read-only — wraps robin_stocks.robinhood.account.get_all_watchlists.
 
     Returns:
-        List of watchlist metadata records (each typically has a name and url).
-        Use the returned names with get_watchlist(name) to fetch contents.
+        List of watchlist metadata records (each has a ``display_name`` and
+        ``id``). Use a returned ``display_name`` with get_watchlist(name).
     """
-    result = _safe_call(rh.account.get_all_watchlists)
-    return result if isinstance(result, list) else []
+    return _watchlist_results(_safe_call(rh.account.get_all_watchlists))
+
+
+def get_watchlist(name: str = "Default") -> list[dict[str, Any]]:
+    """Get stocks in a watchlist.
+
+    Args:
+        name: Watchlist name. Matched case-insensitively against the
+            account's watchlists (default: "Default").
+
+    Returns:
+        List of watchlist items. Each item already carries ``symbol``,
+        ``name``, ``price`` and quote stats — no extra lookups needed.
+
+    Raises:
+        RobinhoodError: If no watchlist matches ``name``. The error lists the
+            available names instead of the misleading "you may need to login
+            first" that an unknown name used to produce (robin_stocks issues a
+            HTTP 400 → None for a non-matching name).
+    """
+    watchlists = _watchlist_results(_safe_call(rh.account.get_all_watchlists))
+    available = [
+        wl["display_name"]
+        for wl in watchlists
+        if isinstance(wl, dict) and wl.get("display_name")
+    ]
+    canonical = next(
+        (n for n in available if n.casefold() == name.casefold()), None
+    )
+    if canonical is None:
+        raise RobinhoodError(
+            f"Watchlist {name!r} not found. "
+            f"Available watchlists: {available or '(none)'}."
+        )
+
+    # Pass the canonical name so robin_stocks' internal exact-match resolves.
+    result = rh.account.get_watchlist_by_name(name=canonical)
+    if result is None:
+        raise RobinhoodError(
+            f"Watchlist {canonical!r} exists but its items could not be "
+            f"fetched (Robinhood returned no data)."
+        )
+    return _watchlist_results(result)
 
 
 def get_quote(symbol: str) -> dict[str, Any]:

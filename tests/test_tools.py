@@ -19,6 +19,7 @@ from robinhood_mcp.tools import (
     get_quote,
     get_ratings,
     get_watchlist,
+    list_watchlists,
     search_symbols,
 )
 
@@ -495,19 +496,87 @@ class TestGetOptionsPositions:
         assert result == expected
 
 
+class TestListWatchlists:
+    """Tests for list_watchlists function."""
+
+    @patch("robinhood_mcp.tools.rh.account.get_all_watchlists")
+    def test_unwraps_dict_results(self, mock_all: MagicMock):
+        """robin_stocks 3.4.0 returns {'results': [...]} — must unwrap."""
+        mock_all.return_value = {
+            "id": "root",
+            "results": [
+                {"display_name": "watch list", "id": "id-1"},
+                {"display_name": "Crypto to watch", "id": "id-2"},
+            ],
+        }
+
+        result = list_watchlists()
+
+        assert [w["display_name"] for w in result] == [
+            "watch list",
+            "Crypto to watch",
+        ]
+
+    @patch("robinhood_mcp.tools.rh.account.get_all_watchlists")
+    def test_accepts_bare_list(self, mock_all: MagicMock):
+        """Older robin_stocks shape (bare list) still works."""
+        mock_all.return_value = [{"display_name": "L", "id": "x"}]
+
+        assert list_watchlists() == [{"display_name": "L", "id": "x"}]
+
+
 class TestGetWatchlist:
     """Tests for get_watchlist function."""
 
+    _LISTS = {
+        "results": [
+            {"display_name": "watch list", "id": "id-1"},
+            {"display_name": "Crypto to watch", "id": "id-2"},
+        ]
+    }
+
     @patch("robinhood_mcp.tools.rh.account.get_watchlist_by_name")
-    def test_returns_watchlist(self, mock_watchlist: MagicMock):
-        """Should return watchlist items."""
-        expected = [{"symbol": "AAPL"}, {"symbol": "TSLA"}]
-        mock_watchlist.return_value = expected
+    @patch("robinhood_mcp.tools.rh.account.get_all_watchlists")
+    def test_resolves_name_case_insensitively_and_unwraps(
+        self, mock_all: MagicMock, mock_by_name: MagicMock
+    ):
+        """'WATCH LIST' must resolve to canonical 'watch list' and unwrap dict."""
+        mock_all.return_value = self._LISTS
+        mock_by_name.return_value = {
+            "results": [{"symbol": "AAPL"}, {"symbol": "TSLA"}]
+        }
 
-        result = get_watchlist("Default")
+        result = get_watchlist("WATCH LIST")
 
-        assert result == expected
-        mock_watchlist.assert_called_once_with(name="Default")
+        assert result == [{"symbol": "AAPL"}, {"symbol": "TSLA"}]
+        mock_by_name.assert_called_once_with(name="watch list")
+
+    @patch("robinhood_mcp.tools.rh.account.get_all_watchlists")
+    def test_unknown_name_raises_actionable_error(self, mock_all: MagicMock):
+        """Unknown name lists available names, not 'login first'."""
+        mock_all.return_value = self._LISTS
+
+        with pytest.raises(RobinhoodError) as exc_info:
+            get_watchlist("Default")
+
+        msg = str(exc_info.value)
+        assert "not found" in msg
+        assert "watch list" in msg
+        assert "login" not in msg.lower()
+
+    @patch("robinhood_mcp.tools.rh.account.get_watchlist_by_name")
+    @patch("robinhood_mcp.tools.rh.account.get_all_watchlists")
+    def test_existing_but_unfetchable_raises_clear_error(
+        self, mock_all: MagicMock, mock_by_name: MagicMock
+    ):
+        """None from a resolved name is not reported as a login problem."""
+        mock_all.return_value = self._LISTS
+        mock_by_name.return_value = None
+
+        with pytest.raises(RobinhoodError) as exc_info:
+            get_watchlist("watch list")
+
+        assert "login" not in str(exc_info.value).lower()
 
 
 class TestSearchSymbols:

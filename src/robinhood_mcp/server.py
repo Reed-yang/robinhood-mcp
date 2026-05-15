@@ -135,12 +135,15 @@ def robinhood_get_position(symbol: str) -> dict:
 
 @mcp.tool()
 def robinhood_get_watchlist(name: str = "Default") -> list:
-    """Get stocks in a watchlist.
+    """Get stocks in a watchlist (read-only).
 
     Args:
-        name: Watchlist name (default: "Default")
+        name: Watchlist name, matched case-insensitively. If unsure of the
+            exact name, call robinhood_list_watchlists first — an unknown
+            name raises an error listing the available names.
 
-    Returns list of watchlist items with instrument details.
+    Returns list of watchlist items; each item already includes symbol,
+    name, price and quote stats.
     """
     _ensure_logged_in()
     return get_watchlist(name)
@@ -150,8 +153,9 @@ def robinhood_get_watchlist(name: str = "Default") -> list:
 def robinhood_list_watchlists() -> list:
     """List all watchlists for the authenticated user (read-only).
 
-    Returns watchlist metadata (names + urls). Use a returned name with
-    robinhood_get_watchlist(name) to fetch its contents.
+    Returns watchlist metadata; each record has a ``display_name`` and
+    ``id``. Pass a returned ``display_name`` to robinhood_get_watchlist(name)
+    to fetch its contents.
     """
     _ensure_logged_in()
     return list_watchlists()

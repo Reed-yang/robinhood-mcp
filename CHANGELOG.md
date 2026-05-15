@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Bug Fixes
+
+* **watchlists:** unwrap robin_stocks 3.4.0's `{"results": [...]}` payload.
+  `list_watchlists` previously coerced the dict to `[]`, and `get_watchlist`
+  did the same for a successful lookup, so both returned empty.
+* **watchlists:** resolve watchlist names case-insensitively. robin_stocks'
+  internal lookup is exact + case-sensitive and returns `None` (HTTP 400)
+  for any non-matching name, which surfaced as a misleading "you may need to
+  login first". Unknown names now raise an error listing the available
+  watchlist names instead.
+
 ## [0.1.2](https://github.com/verygoodplugins/robinhood-mcp/compare/v0.1.1...v0.1.2) (2026-03-08)
 
 
