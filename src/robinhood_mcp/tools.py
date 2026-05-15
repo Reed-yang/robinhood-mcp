@@ -254,6 +254,19 @@ def get_watchlist(name: str = "Default") -> list[dict[str, Any]]:
     return result if isinstance(result, list) else []
 
 
+def list_watchlists() -> list[dict[str, Any]]:
+    """List all watchlists for the authenticated user.
+
+    Read-only — wraps robin_stocks.robinhood.account.get_all_watchlists.
+
+    Returns:
+        List of watchlist metadata records (each typically has a name and url).
+        Use the returned names with get_watchlist(name) to fetch contents.
+    """
+    result = _safe_call(rh.account.get_all_watchlists)
+    return result if isinstance(result, list) else []
+
+
 def get_quote(symbol: str) -> dict[str, Any]:
     """Get real-time quote for a stock symbol.
 

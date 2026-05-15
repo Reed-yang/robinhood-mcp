@@ -23,6 +23,7 @@ from .tools import (
     get_quote,
     get_ratings,
     get_watchlist,
+    list_watchlists,
     search_symbols,
 )
 
@@ -143,6 +144,17 @@ def robinhood_get_watchlist(name: str = "Default") -> list:
     """
     _ensure_logged_in()
     return get_watchlist(name)
+
+
+@mcp.tool()
+def robinhood_list_watchlists() -> list:
+    """List all watchlists for the authenticated user (read-only).
+
+    Returns watchlist metadata (names + urls). Use a returned name with
+    robinhood_get_watchlist(name) to fetch its contents.
+    """
+    _ensure_logged_in()
+    return list_watchlists()
 
 
 @mcp.tool()

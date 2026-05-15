@@ -184,6 +184,7 @@ def test_known_read_only_tools_still_present():
         "robinhood_get_positions",
         "robinhood_get_position",
         "robinhood_get_watchlist",
+        "robinhood_list_watchlists",
         "robinhood_get_quote",
         "robinhood_get_fundamentals",
         "robinhood_get_historicals",
